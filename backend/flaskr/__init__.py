@@ -89,7 +89,7 @@ def create_app(test_config=None):
         categories = Category.query.all()
         formatted_categories = {category.id: category.type for category in categories}
 
-        current_category = "All"
+        current_category = "ALL"
         if len(selection) > 0:
             current_category = selection[0].category
 
@@ -107,6 +107,20 @@ def create_app(test_config=None):
     TEST: When you click the trash icon next to a question, the question will be removed.
     This removal will persist in the database and when you refresh the page.
     """
+    @app.route('/questions/<int:id>', methods=['DELETE'])
+    def delete_question(id):
+        try:
+            question = Question.query.get(id)  
+            if question is None:
+                abort(404)
+
+            question.delete()  
+            return jsonify({'deleted': id}), 200
+        
+        except:
+            abort(422)
+
+
 
     """
     @TODO:
@@ -129,6 +143,56 @@ def create_app(test_config=None):
     only question that include that string within their question.
     Try using the word "title" to start.
     """
+    @app.route('/questions', methods=['POST'])
+    def post_questions():
+        body = request.get_json()
+
+        # POST route for SEARCH questions
+        if 'searchTerm' in body:
+            search_term = body.get('searchTerm', '')
+            selection = Question.query.filter(Question.question.ilike(f'%{search_term}%')).all()
+            questions = [question.format() for question in selection]
+            
+            total_questions = len(selection)
+            current_category = "ALL"
+            if len(selection) > 0:
+                current_category = selection[0].category
+
+            return jsonify({
+                'questions': questions,
+                'totalQuestions': total_questions,
+                'currentCategory': current_category
+            })
+        
+        # POST route to CREATE new questions
+        else:
+            question = body.get('question', None)
+            answer = body.get('answer', None)
+            difficulty = body.get('difficulty', None)
+            category_id = body.get('category', None)
+
+            if not all([question, answer, difficulty, category_id]):
+                abort(400)
+            
+            try:
+                # Searching for the CATEGORY TYPE to Create the New Question
+                category = Category.query.get(category_id)
+                if category is None:
+                   abort(404)
+                
+                new_question = Question(question=question, answer=answer, difficulty=difficulty, category=category.type)
+                new_question.insert()
+                return jsonify({
+                    'success': True
+                })
+            
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({
+                    'message': 'An error occurred',
+                    'error': str(e)
+                }), 500
+
 
     """
     @TODO:
@@ -143,7 +207,7 @@ def create_app(test_config=None):
 
         category = Category.query.get(id)  
         if category is None:
-            return jsonify({'message': 'Category not found'}), 404  
+            abort(404) 
 
         selection = Question.query.filter(Question.category == category.type).order_by(Question.id).all()  
         total_questions = len(selection)  
@@ -166,12 +230,88 @@ def create_app(test_config=None):
     one question at a time is displayed, the user is allowed to answer
     and shown whether they were correct or not.
     """
+    @app.route('/quizzes', methods=['POST'])
+    def post_quizzes():
+        body = request.get_json()
+        previous_questions = body.get('previous_questions', [])
+        quiz_category = body.get('quiz_category', None)
+        if quiz_category is None:
+            return jsonify({'message': 'Category is required'}), 400
+        
+        category_id = quiz_category.get('id')
+        if category_id is None:
+            return jsonify({'message': 'Category is not found'}), 400
+        
+        # if Category is 'ALL':
+        if category_id == 0:
+            questions = Question.query.filter(Question.id.notin_(previous_questions)).all()
+        # if Category is a specific one
+        else:
+            try:
+                category = Category.query.get(category_id)
+
+                if category is None:
+                    abort(404)
+                
+                questions = Question.query.filter(Question.category==category.type,
+                                                  Question.id.notin_(previous_questions)).all()
+                
+            except:
+                return jsonify({'message': 'Category not found'}), 404
+        
+        # When there are no more questions:
+        if not questions:
+            return jsonify({'question': None}), 200
+        # Otherwise keep playing
+        question = random.choice(questions)
+
+        return jsonify({'question': question.format()}), 200
 
     """
     @TODO:
     Create error handlers for all expected errors
     including 404 and 422.
     """
+    @app.errorhandler(400)
+    def bad_request(error):
+        return jsonify({
+            'success': False,
+            'error': 400,
+            'message': 'bad request'
+        }), 400
+    
+    @app.errorhandler(404)
+    def bad_request(error):
+        return jsonify({
+            'success': False,
+            'error': 404,
+            'message': 'resource not found'
+        }), 404
+
+    @app.errorhandler(405)
+    def bad_request(error):
+        return jsonify({
+            'success': False,
+            'error': 405,
+            'message': 'method not allowed'
+        }), 405
+
+    @app.errorhandler(422)
+    def bad_request(error):
+        return jsonify({
+            'success': False,
+            'error': 422,
+            'message': 'unprocessable'
+        }), 422
+
+    @app.errorhandler(500)
+    def bad_request(error):
+        return jsonify({
+            'success': False,
+            'error': 500,
+            'message': 'internal server error'
+        }), 500
+
 
     return app
 
