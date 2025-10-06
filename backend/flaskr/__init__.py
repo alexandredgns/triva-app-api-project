@@ -39,8 +39,17 @@ def create_app(test_config=None):
     """
     @app.after_request
     def after_request(response):
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,true')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,PATCH,POST,DELETE,OPTIONS')
+        
+        if not response.headers.get('Access-Control-Allow-Origin'):
+            response.headers.add('Access-Control-Allow-Origin', '*')  
+    
+        if not response.headers.get('Access-Control-Allow-Headers'):
+            response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,true')
+    
+        if not response.headers.get('Access-Control-Allow-Methods'):
+            response.headers.add('Access-Control-Allow-Methods', 'GET,PATCH,POST,DELETE,OPTIONS')
+
+        return response
 
     """
     @TODO:
@@ -50,8 +59,6 @@ def create_app(test_config=None):
     @app.route('/categories', methods=['GET'])
     def get_categories():
         categories = Category.query.all()
-        if categories is None:
-            return jsonify({'categories': {}}), 200
         
         formatted_categories = {category.id: category.type for category in categories}
 
@@ -72,6 +79,26 @@ def create_app(test_config=None):
     ten questions per page and pagination at the bottom of the screen for three pages.
     Clicking on the page numbers should update the questions.
     """
+    @app.route('/questions', methods=['GET'])
+    def get_questions():
+        selection = Question.query.order_by(Question.id).all()
+        total_questions = len(selection)
+
+        current_questions = paginate_questions(request, selection)
+
+        categories = Category.query.all()
+        formatted_categories = {category.id: category.type for category in categories}
+
+        current_category = "All"
+        if len(selection) > 0:
+            current_category = selection[0].category
+
+        return jsonify({
+            'questions': current_questions,
+            'totalQuestions': total_questions,
+            'categories': formatted_categories,
+            'currentCategory': current_category
+        })
 
     """
     @TODO:
@@ -111,6 +138,22 @@ def create_app(test_config=None):
     categories in the left column will cause only questions of that
     category to be shown.
     """
+    @app.route('/categories/<int:id>/questions', methods=['GET'])
+    def get_questions_by_category(id):
+
+        category = Category.query.get(id)  
+        if category is None:
+            return jsonify({'message': 'Category not found'}), 404  
+
+        selection = Question.query.filter(Question.category == category.type).order_by(Question.id).all()  
+        total_questions = len(selection)  
+        current_questions = paginate_questions(request, selection) 
+
+        return jsonify({
+            'questions': current_questions,
+            'totalQuestions': total_questions,
+            'currentCategory': category.type  
+        })
 
     """
     @TODO:
