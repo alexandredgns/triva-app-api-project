@@ -1,6 +1,7 @@
 from flask import Flask, request, abort, jsonify
 from flask_cors import CORS
 import random
+import math
 
 from models import setup_db, Question, Category, db
 
@@ -10,6 +11,10 @@ def paginate_questions(request, selection):
     page = request.args.get('page', 1, type=int)
     start = (page - 1) * QUESTIONS_PER_PAGE
     end = start + QUESTIONS_PER_PAGE
+
+    max_page = math.ceil(len(selection) / QUESTIONS_PER_PAGE)
+    if page > max_page:
+        abort(404)
 
     questions = [question.format() for question in selection]
     current_questions = questions[start:end]

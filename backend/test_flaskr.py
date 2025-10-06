@@ -1,5 +1,7 @@
 import os
 import unittest
+import json
+from flask_sqlalchemy import SQLAlchemy
 
 from flaskr import create_app
 from models import db, Question, Category
@@ -28,16 +30,62 @@ class TriviaTestCase(unittest.TestCase):
         with self.app.app_context():
             db.create_all()
 
+
+        # ----- SAMPLE DATA FOR TESTING ------
+        self.new_question = {
+            'question': 'Who is the FOOTBALL GOAT?',
+            'answer': 'Pelé',
+            'difficulty': 3,
+            'category': 6
+        }
+        self.search_term = {
+            'searchTerm': 'What'
+        }
+        # ------------------------------------
+
     def tearDown(self):
         """Executed after each test"""
-        with self.app.app_context():
-            db.session.remove()
-            db.drop_all()
+        pass
 
     """
     TODO
     Write at least one test for each test for successful operation and for expected errors.
     """
+    def test_get_categories(self):
+        res = self.client.get('/categories')
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(data['categories'])
+
+
+    def test_get_paginated_questions(self):
+        res = self.client.get('/questions')
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(data['questions'])
+        self.assertTrue(data['totalQuestions'])
+        self.assertTrue(data['categories'])
+        self.assertTrue(data['currentCategory'])
+
+    
+    def test_404_sent_requesting_beyond_valid_page(self):
+        res = self.client.get('/questions?page=1000')
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(data['message'], 'resource not found')
+
+
+    def test_get_questions_by_category(self):
+        res = self.client.get('/categories/1/questions')
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(data['questions'])
+        self.assertTrue(data['totalQuestions'])
+        self.assertTrue(data['currentCategory'])
 
 
 # Make the tests conveniently executable
