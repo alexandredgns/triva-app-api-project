@@ -114,11 +114,11 @@ def create_app(test_config=None):
     """
     @app.route('/questions/<int:id>', methods=['DELETE'])
     def delete_question(id):
+        question = Question.query.get(id)  
+        if question is None:
+            abort(404)
+        
         try:
-            question = Question.query.get(id)  
-            if question is None:
-                abort(404)
-
             question.delete()  
             return jsonify({'deleted': id}), 200
         
@@ -179,24 +179,21 @@ def create_app(test_config=None):
             if not all([question, answer, difficulty, category_id]):
                 abort(400)
             
-            try:
-                # Searching for the CATEGORY TYPE to Create the New Question
-                category = Category.query.get(category_id)
-                if category is None:
-                   abort(404)
-                
+            # Searching for the CATEGORY TYPE to Create the New Question
+            category = Category.query.get(category_id)
+            if category is None:
+                abort(404)
+
+            try:    
                 new_question = Question(question=question, answer=answer, difficulty=difficulty, category=category.type)
                 new_question.insert()
                 return jsonify({
                     'success': True
                 })
             
-            except Exception as e:
+            except:
                 db.session.rollback()
-                return jsonify({
-                    'message': 'An error occurred',
-                    'error': str(e)
-                }), 500
+                abort(500)
 
 
     """
@@ -241,11 +238,11 @@ def create_app(test_config=None):
         previous_questions = body.get('previous_questions', [])
         quiz_category = body.get('quiz_category', None)
         if quiz_category is None:
-            return jsonify({'message': 'Category is required'}), 400
+            return jsonify({'message': 'category is required'}), 400
         
         category_id = quiz_category.get('id')
         if category_id is None:
-            return jsonify({'message': 'Category is not found'}), 400
+            return jsonify({'message': 'category is not found'}), 404
         
         # if Category is 'ALL':
         if category_id == 0:
